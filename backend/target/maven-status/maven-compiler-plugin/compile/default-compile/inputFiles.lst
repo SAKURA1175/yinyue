@@ -1,0 +1,17 @@
+D:\yinyue\backend\src\main\java\com\yinyue\ai\asr\QwenAsrService.java
+D:\yinyue\backend\src\main\java\com\yinyue\config\RestTemplateConfig.java
+D:\yinyue\backend\src\main\java\com\yinyue\controller\FileUploadController.java
+D:\yinyue\backend\src\main\java\com\yinyue\service\MusicTrackService.java
+D:\yinyue\backend\src\main\java\com\yinyue\YinyueApplication.java
+D:\yinyue\backend\src\main\java\com\yinyue\ai\image\StableDiffusionService.java
+D:\yinyue\backend\src\main\java\com\yinyue\config\CorsConfig.java
+D:\yinyue\backend\src\main\java\com\yinyue\controller\FullPipelineController.java
+D:\yinyue\backend\src\main\java\com\yinyue\entity\MusicTrack.java
+D:\yinyue\backend\src\main\java\com\yinyue\controller\AIController.java
+D:\yinyue\backend\src\main\java\com\yinyue\controller\TestController.java
+D:\yinyue\backend\src\main\java\com\yinyue\repository\MusicTrackRepository.java
+D:\yinyue\backend\src\main\java\com\yinyue\controller\MusicRecognitionController.java
+D:\yinyue\backend\src\main\java\com\yinyue\ai\llm\QwenLLMService.java
+D:\yinyue\backend\src\main\java\com\yinyue\ai\music\AuddApiService.java
+D:\yinyue\backend\src\main\java\com\yinyue\service\FileUploadService.java
+D:\yinyue\backend\src\main\java\com\yinyue\controller\NetEaseController.java

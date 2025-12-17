@@ -1,0 +1,147 @@
+spring:
+  application:
+    name: yinyue-backend # 项目的名字，就像是给孩子起名字叫“yinyue-backend”
+  
+  # ========================================================================
+  # Spring AI 配置 (人工智能大脑)
+  # ========================================================================
+  ai:
+    openai:
+      api-key: sk-36dfedb03bcf4640a16a4641d56f5319 # 阿里云的通行证 (虽然写着 openai，但其实是连的阿里云)
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 阿里云的"模仿"接口，假装自己是 OpenAI
+      chat:
+        options:
+          model: qwen-long # 默认使用的模型名字
+          temperature: 0.7 # 创意程度（0=严格，1=创意）
+
+  # ========================================================================
+  # MySQL 数据库配置 (数据仓库)
+  # ========================================================================
+  datasource:
+    # 数据库的地址。
+    # jdbc:mysql://localhost:3306/yinyue_db: 意思是连接本机 3306 端口上叫 yinyue_db 的数据库。
+    # useSSL=false: 不使用加密连接（开发环境用，省事）。
+    # serverTimezone=UTC: 使用世界标准时间。
+    # characterEncoding=utf8: 使用 UTF-8 编码，防止中文乱码。
+    url: jdbc:mysql://localhost:3306/yinyue_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true&allowLoadLocalInfile=false
+    username: root # 数据库管理员账号
+    password: 1234 # 数据库管理员密码
+    driver-class-name: com.mysql.cj.jdbc.Driver # 使用的“司机”（驱动程序），用来开动 MySQL。
+    
+    # 连接池配置 (HikariCP)
+    # 就像是出租车公司，不用每次有人打车都现买一辆车，而是预先准备好几辆车（连接）等着。
+    hikari:
+      maximum-pool-size: 10 # 最多同时有 10 辆车接客。
+      minimum-idle: 5       # 至少保留 5 辆空车等着，随叫随到。
+  
+  # ========================================================================
+  # JPA 配置 (数据库管家)
+  # ========================================================================
+  jpa:
+    hibernate:
+      # ddl-auto: create 
+      # 这是一个非常霸道的设置！每次启动程序，都会把原来的表删掉，重新建一张空表。
+      # 开发测试的时候很方便，但上线千万别用，否则数据全没了！
+      # 如果想保留数据，可以改成 "update"。
+      ddl-auto: create
+    show-sql: false # 是否在控制台打印 SQL 语句（太啰嗦了，关掉）。
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect # 告诉管家我们用的是 MySQL 方言。
+        format_sql: true # 如果打印 SQL，就格式化一下，哪怕是程序员也要看整齐的代码。
+  
+  # ========================================================================
+  # Redis 配置 (高速缓存)
+  # ========================================================================
+  redis:
+    host: localhost # Redis 住在哪里（本机）。
+    port: 6379      # Redis 的门牌号。
+    database: 0     # Redis 默认有 16 个房间，我们用第 0 号房间。
+    timeout: 2000   # 超时时间 2 秒。
+    jedis:
+      pool:
+        max-active: 20 # 最多 20 个连接。
+        max-idle: 10   # 最多 10 个空闲。
+        min-idle: 5    # 最少 5 个空闲。
+  
+  # ========================================================================
+  # 文件上传配置
+  # ========================================================================
+  servlet:
+    multipart:
+      max-file-size: 100MB    # 单个文件最大 100MB。
+      max-request-size: 100MB # 整个请求最大 100MB。
+
+# ========================================================================
+# 服务器配置
+# ========================================================================
+server:
+  port: 8081 # 我们的程序运行在 8081 端口。
+  servlet:
+    context-path: /api # 所有接口的前缀。比如访问 /upload 实际上是 /api/upload。
+
+# ========================================================================
+# 日志配置
+# ========================================================================
+logging:
+  level:
+    root: INFO # 默认只打印重要的信息。
+    com.yinyue: DEBUG # 但是对于我们自己写的代码 (com.yinyue)，要打印得详细一点 (DEBUG)，方便找 bug。
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n" # 日志打印的格式：日期 \u65f6\u95f4 - \u6d88\u606f \u6362\u884c。
+
+# ========================================================================
+# Actuator 配置 (健康检查、暴露端点)
+# ========================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus # 暴露端点，便于监控
+  endpoint:
+    health:
+      show-details: always # 总是显示详细的健康检查
+  metrics:
+    export:
+      simple:
+        enabled: true
+
+# ========================================================================
+# 自定义应用配置 (我们自己定义的变量)
+# ========================================================================
+app:
+  # AI 服务配置
+  ai:
+    # 阿里通义千问配置 (负责分析歌词)
+    qwen:
+      api-key: sk-36dfedb03bcf4640a16a4641d56f5319 # 阿里云的通行证
+      model-asr: qwen3-asr-flash # 语音识别模型
+      model-llm: qwen-long       # 文本生成模型
+      asr-endpoint: https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcriptions
+      endpoint: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+      # AI 服务超时和重试配置
+      timeout: 30000 # 30秒超时
+      max-retries: 3 # 最多重试3次
+    
+    # Audd API 配置 (负责听歌识曲)
+    audd:
+      api-key: 3679dd5b7ed89b910f3420076a63ef6c # Audd 的通行证
+      endpoint: https://api.audd.io/
+      timeout: 30000
+      max-retries: 2
+    
+    # Stable Diffusion WebUI 配置 (负责画图)
+    stable-diffusion:
+      endpoint: http://127.0.0.1:7860 # 本地 SD 的地址
+      enabled: true
+  
+  # 文件存储配置
+  storage:
+    type: local # 存储类型：local (本地硬盘), oss (阿里云对象存储), cos (腾讯云)
+    local-path: ./uploads # 如果是本地存储，存在哪里
+    # OSS 配置（预留，以后如果有钱上云了可以用）
+    oss:
+      endpoint: https://oss-cn-beijing.aliyuncs.com
+      access-key-id: your_access_key
+      access-key-secret: your_secret_key
+      bucket-name: yinyue-music

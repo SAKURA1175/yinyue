@@ -1,0 +1,195 @@
+.result-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.result-header {
+  text-align: center;
+  margin-bottom: 32px;
+  color: white;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.result-header h2 {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.result-id {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.card-header {
+  font-weight: 700;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+/* 音乐信息 */
+.music-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item label {
+  font-size: 12px;
+  color: #999;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.info-item value {
+  font-size: 16px;
+  color: #333;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+/* AI 分析 */
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analysis-item {
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.analysis-item .label {
+  font-weight: 600;
+  color: #667eea;
+  margin-right: 8px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.analysis-item .value {
+  color: #333;
+  line-height: 1.6;
+}
+
+.prompt-text {
+  color: #555;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+/* 颜色调色板 */
+.color-palette {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.color-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 2px solid #f0f0f0;
+}
+
+.color-item span {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+}
+
+/* 专辑封面 */
+.cover-display {
+  text-align: center;
+  padding: 20px;
+}
+
+.cover-image {
+  max-width: 100%;
+  width: 300px;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* 操作按钮 */
+.result-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+
+.result-actions .button {
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+@media (max-width: 768px) {
+  .result-container {
+    padding: 20px 10px;
+  }
+
+  .result-header h2 {
+    font-size: 24px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .music-info {
+    grid-template-columns: 1fr;
+  }
+
+  .cover-image {
+    width: 200px;
+    height: 200px;
+  }
+
+  .result-actions .button {
+    min-width: 140px;
+  }
+}

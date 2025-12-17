@@ -1,0 +1,170 @@
+========================================
+⚡ 3 分钟快速开始指南
+========================================
+
+你的环境已完全准备好！
+
+✅ Git 2.51.1 已安装
+✅ Python 3.14.0 已安装
+✅ RTX 4060 GPU 已就绪
+✅ CUDA 12.6 已就绪
+✅ 所有脚本已生成
+
+现在只需 3 个命令就能启动完整项目！
+
+========================================
+【第 1 步】启动数据库（1 分钟）
+========================================
+
+打开 CMD 或 PowerShell，运行:
+
+cd d:\yinyue
+docker-compose up -d
+
+验证:
+docker ps
+
+（应该看到 yinyue-postgres 和 yinyue-redis）
+
+========================================
+【第 2 步】启动 Stable Diffusion（首次 30 分钟）
+========================================
+
+打开新的 CMD 或 PowerShell，运行:
+
+cd d:\yinyue\sd-webui
+.\一键部署SD.bat
+
+等待完成，会自动打开 WebUI
+
+浏览器访问: http://127.0.0.1:7860
+
+【首次启动需要】
+- 克隆代码: ~5 分钟
+- 下载 PyTorch: ~5-10 分钟
+- 下载模型: ~10-20 分钟
+
+【后续启动只需】
+双击: d:\yinyue\sd-webui\快速启动SD.bat
+
+========================================
+【第 3 步】启动后端和前端（2 分钟）
+========================================
+
+打开第 3 个 CMD，启动后端:
+
+cd d:\yinyue\backend
+mvn spring-boot:run
+
+看到 "Started YinyueApplication" 说明成功
+
+验证: http://localhost:8080/api/test/health
+
+---
+
+打开第 4 个 CMD，启动前端:
+
+cd d:\yinyue\frontend
+npm run dev
+
+看到 "Local: http://localhost:5173/" 说明成功
+
+验证: http://localhost:5173
+
+========================================
+【现在你已经拥有】
+========================================
+
+✅ PostgreSQL 数据库 (localhost:5432)
+✅ Redis 缓存 (localhost:6379)
+✅ Stable Diffusion WebUI (http://127.0.0.1:7860)
+✅ Spring Boot API (http://localhost:8080/api)
+✅ React 前端 (http://localhost:5173)
+
+========================================
+【测试完整流程】
+========================================
+
+用 Postman 或浏览器测试:
+
+POST http://localhost:8080/api/test/full-pipeline
+
+请求体:
+{
+  "lyrics": "这是一首关于爱情的歌，讲述了两个人的故事",
+  "title": "爱情",
+  "artist": "示例歌手"
+}
+
+预期响应:
+{
+  "success": true,
+  "analysis": "AI 分析结果（JSON 格式）",
+  "image": "Base64 编码的生成图片",
+  "generation_time_ms": 15000
+}
+
+========================================
+【常见问题】
+========================================
+
+Q: "Docker 容器启动失败"
+A: 确保 Docker Desktop 在运行，重试即可
+
+Q: "一键部署SD.bat 出错"
+A: 运行 "故障排除.bat" 诊断环境
+   位置: d:\yinyue\sd-webui\故障排除.bat
+
+Q: "后端无法启动"
+A: 确保 PostgreSQL 已启动
+   docker ps 验证
+
+Q: "前端无法连接后端"
+A: 确保后端在运行
+   http://localhost:8080/api/test/health
+
+Q: "SD 生成太慢"
+A: RTX 4060 需要 10-30 秒，这是正常的
+
+========================================
+【详细文档】
+========================================
+
+完整的启动指南: d:\yinyue\启动指南.txt
+Stable Diffusion 详细说明: d:\yinyue\sd-webui\SD部署说明.txt
+项目概述: d:\yinyue\音乐.md
+
+========================================
+【项目目录】
+========================================
+
+d:\yinyue\
+├── backend/                  ← Spring Boot 后端
+├── frontend/                 ← React 前端
+├── sd-webui/                ← Stable Diffusion
+│   ├── 一键部署SD.bat       ← ⭐ 首次启动用这个
+│   ├── 快速启动SD.bat       ← ⭐ 后续启动用这个
+│   └── SD部署说明.txt       ← 详细说明
+├── scripts/                  ← 数据库脚本
+├── docker-compose.yml        ← Docker 配置
+└── 启动指南.txt              ← 完整指南
+
+========================================
+
+准备好了吗？开始吧！🚀
+
+【一键启动所有服务的命令】
+
+# 终端 1 - 启动数据库
+cd d:\yinyue && docker-compose up -d
+
+# 终端 2 - 启动 Stable Diffusion（首次 30 分钟）
+cd d:\yinyue\sd-webui && .\一键部署SD.bat
+
+# 终端 3 - 启动后端
+cd d:\yinyue\backend && mvn spring-boot:run
+
+# 终端 4 - 启动前端
+cd d:\yinyue\frontend && npm run dev
+
+========================================

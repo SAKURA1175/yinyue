@@ -1,0 +1,256 @@
+========================================
+🎼 AI 音乐专辑网站 - 快速启动指南
+========================================
+
+【项目结构】
+d:\yinyue\
+├── backend/              ← Spring Boot 后端项目
+├── frontend/             ← React + Vite 前端项目
+├── sd-webui/            ← Stable Diffusion WebUI
+├── scripts/             ← SQL 初始化脚本
+├── docker-compose.yml   ← 数据库容器配置
+├── setup.bat            ← 一键初始化脚本
+└── 启动指南.txt          ← 本文件
+
+========================================
+【步骤 1】启动数据库和缓存（Docker）
+========================================
+
+前置条件:
+  ✓ 安装了 Docker Desktop
+  ✓ Docker 服务正在运行
+
+执行命令:
+  cd d:\yinyue
+  docker-compose up -d
+
+验证:
+  docker ps
+  （应该看到 yinyue-postgres 和 yinyue-redis 两个容器）
+
+========================================
+【步骤 2】启动 Stable Diffusion WebUI
+========================================
+
+前置条件:
+  ✓ 安装了 Python 3.10+
+  ✓ 安装了 CUDA（对于 RTX 4060）
+  ✓ Git 已安装
+
+执行命令:
+  cd d:\yinyue\sd-webui
+  
+  # 第一次需要下载 WebUI (大约 2-3GB)
+  git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+  
+  # 进入目录
+  cd stable-diffusion-webui
+  
+  # 启动 WebUI（第一次会下载模型，需要 10-30 分钟）
+  .\webui-user.bat --api
+
+期望输出:
+  Loaded checkpoint /path/to/model.safetensors
+  * Running on http://127.0.0.1:7860
+
+验证:
+  浏览器访问: http://127.0.0.1:7860
+  应该看到 WebUI 界面
+
+========================================
+【步骤 3】启动 Spring Boot 后端
+========================================
+
+前置条件:
+  ✓ 安装了 Java 17+
+  ✓ 安装了 Maven 3.6+
+  ✓ PostgreSQL 正在运行（Step 1）
+
+执行命令:
+  cd d:\yinyue\backend
+  
+  # 首次需要下载依赖（大约 5-10 分钟）
+  mvn clean install
+  
+  # 启动应用
+  mvn spring-boot:run
+
+期望输出:
+  Started YinyueApplication in X.XXX seconds
+
+验证:
+  浏览器访问: http://localhost:8080/api/test/health
+  
+  期望响应:
+  {
+    "status": "healthy",
+    "qwen_llm": "OK",
+    "stable_diffusion": "OK",
+    "timestamp": 1702123456789
+  }
+
+========================================
+【步骤 4】启动 React 前端
+========================================
+
+前置条件:
+  ✓ 安装了 Node.js 18+
+  ✓ npm 或 pnpm
+
+执行命令:
+  cd d:\yinyue\frontend
+  
+  # 初始化项目（如果还没有）
+  .\init.bat
+  
+  # 启动开发服务器
+  npm run dev
+
+期望输出:
+  VITE v4.x.x  ready in XXX ms
+  ➜  Local:   http://localhost:5173/
+
+验证:
+  浏览器访问: http://localhost:5173
+  应该看到 React 界面
+
+========================================
+【完整启动流程图】
+========================================
+
+# 第一次启动（10-30 分钟）
+1. docker-compose up -d           （启动 PostgreSQL + Redis）
+2. cd sd-webui && git clone ...   （下载 Stable Diffusion）
+3. .\webui-user.bat --api         （启动 WebUI，下载模型）
+4. cd backend && mvn clean install （下载 Maven 依赖）
+5. mvn spring-boot:run            （启动后端）
+6. cd frontend && npm install      （安装前端依赖）
+7. npm run dev                     （启动前端）
+
+# 后续启动（1 分钟）
+1. docker-compose up -d
+2. cd sd-webui\stable-diffusion-webui && .\webui-user.bat --api
+3. cd backend && mvn spring-boot:run
+4. cd frontend && npm run dev
+
+========================================
+【测试 API】
+========================================
+
+1. 健康检查
+   GET http://localhost:8080/api/test/health
+
+2. 测试 Qwen LLM
+   POST http://localhost:8080/api/test/qwen/chat
+   Body: {"prompt": "你好"}
+
+3. 测试音乐分析
+   POST http://localhost:8080/api/test/qwen/analyze-music
+   Body: {
+     "lyrics": "这是一首关于爱情的歌",
+     "title": "爱情",
+     "artist": "艺术家"
+   }
+
+4. 测试图片生成
+   POST http://localhost:8080/api/test/sd/generate
+   Body: {
+     "prompt": "a beautiful album cover, neon blue and purple",
+     "steps": 30
+   }
+
+5. 完整流程测试
+   POST http://localhost:8080/api/test/full-pipeline
+   Body: {
+     "lyrics": "歌词内容",
+     "title": "歌曲名",
+     "artist": "歌手名"
+   }
+
+========================================
+【常见问题】
+========================================
+
+Q: Stable Diffusion 启动很慢
+A: 这是正常的。第一次启动需要下载大约 4GB 的模型文件。
+   如果你的网络慢，可能需要 30 分钟或更久。
+
+Q: "No module named torch"
+A: WebUI 会自动下载 PyTorch。如果出错，手动运行:
+   cd sd-webui\stable-diffusion-webui
+   python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+Q: PostgreSQL 连接失败
+A: 检查容器是否运行:
+   docker ps
+   
+   如果容器不在，重新启动:
+   docker-compose up -d
+
+Q: 前端无法连接后端
+A: 检查后端是否启动:
+   http://localhost:8080/api/test/health
+   
+   如果无法访问，确保:
+   - 后端启动成功
+   - 防火墙没有阻止 8080 端口
+   - 没有其他应用占用 8080 端口
+
+Q: 图片生成很慢
+A: RTX 4060 生成一张图片需要 10-30 秒。这是正常的。
+   如果要加快，可以:
+   - 降低 steps (从 30 改成 20)
+   - 启用 TensorRT 优化
+   - 使用更快的采样器
+
+========================================
+【GPU 优化（可选）】
+========================================
+
+对于 RTX 4060，建议的启动参数:
+
+  .\webui-user.bat --api --opt-sdp-attention --no-half
+
+参数说明:
+  --api: 启用 API 模式
+  --opt-sdp-attention: 使用优化的注意力机制（加快生成）
+  --no-half: 禁用 FP16（某些 GPU 可能有兼容性问题）
+
+其他常用参数:
+  --precision full  : 使用 FP32 精度（更准确但更慢）
+  --upcast-sampling : 上升采样精度
+  --medvram : 节省 VRAM（如果 GPU 内存不足）
+  --lowvram : 极度节省 VRAM（很慢，不推荐）
+
+========================================
+【后续开发步骤】
+========================================
+
+已完成的：
+  ✓ 阶段 0 - 原型验证
+  ✓ 基础架构搭建
+  ✓ API 集成和测试
+
+接下来：
+  [ ] 阶段 1 - MVP 功能
+      - 文件上传和存储
+      - Audd API 歌曲识别
+      - 前端上传界面
+      - 播放器组件
+      
+  [ ] 阶段 2 - 功能增强
+      - 网易云解析
+      - Prompt 编辑器
+      - 多张图片生成
+      - 用户收藏
+      
+  [ ] 阶段 3 - 上线准备
+      - 部署到云服务
+      - CDN 加速
+      - 监控和日志
+
+========================================
+
+需要帮助？可以查看各个模块的代码注释或联系开发团队！
+
+🚀 祝你开发顺利！
