@@ -1,0 +1,9 @@
+.git
+.gitignore
+backend/target
+frontend/node_modules
+frontend/dist
+runtime
+uploads
+backend/uploads
+sd-webui

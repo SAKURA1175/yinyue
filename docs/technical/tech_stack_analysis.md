@@ -1,5 +1,7 @@
 # 项目技术栈深度分析报告
 
+> 历史说明：本文档生成于早期阶段，部分内容与当前代码主线不完全一致。当前请优先以 [current_architecture.md](D:/yinyue/docs/current_architecture.md) 和根 README 为准。
+
 **文档版本**: 1.0  
 **生成日期**: 2025-12-13  
 **责任人**: AI Assistant

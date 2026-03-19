@@ -1,5 +1,7 @@
 # 项目包结构与功能详解文档
 
+> 历史说明：本文档包含旧版页面和已下线控制器的描述。当前请优先以 [current_architecture.md](D:/yinyue/docs/current_architecture.md) 为准。
+
 本文档详细解析了 AI 音乐专辑生成项目的代码结构，包括后端（Java Spring Boot）和前端（React）的每一个包/目录的具体内容和主要作用。
 
 ## 一、 后端项目结构 (Backend)

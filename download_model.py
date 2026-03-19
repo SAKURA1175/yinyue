@@ -69,7 +69,8 @@ def download_file(url, dest_path):
 
 if __name__ == "__main__":
     # 目标目录
-    target_dir = r"D:\yinyue\sd-webui\stable-diffusion-webui\models\Stable-diffusion"
+    default_target_dir = os.path.join(os.path.dirname(__file__), "runtime", "models", "Stable-diffusion")
+    target_dir = os.getenv("SD_MODEL_TARGET_DIR", default_target_dir)
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         

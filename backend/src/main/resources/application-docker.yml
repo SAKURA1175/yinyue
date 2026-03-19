@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: ${APP_DB_URL:jdbc:mysql://mysql:3306/yinyue_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true&allowLoadLocalInfile=false&createDatabaseIfNotExist=true}
+    username: ${APP_DB_USERNAME:yinyue}
+    password: ${APP_DB_PASSWORD:yinyue}
+  redis:
+    host: ${APP_REDIS_HOST:redis}
+    port: ${APP_REDIS_PORT:6379}
+
+app:
+  security:
+    enabled: ${APP_SECURITY_ENABLED:true}
+    rate-limit-enabled: ${APP_RATE_LIMIT_ENABLED:true}

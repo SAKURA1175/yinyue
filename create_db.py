@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
+import os
 import pymysql
 from pymysql import Error
 
 try:
     # 连接到 MySQL 服务器
     connection = pymysql.connect(
-        host='localhost',
-        user='root',
-        password='1234'
+        host=os.getenv('APP_DB_HOST', 'localhost'),
+        user=os.getenv('APP_DB_USERNAME', 'root'),
+        password=os.getenv('APP_DB_PASSWORD', '')
     )
     
     cursor = connection.cursor()

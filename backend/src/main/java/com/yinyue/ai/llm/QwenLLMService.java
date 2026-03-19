@@ -1,11 +1,21 @@
 package com.yinyue.ai.llm;
 
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonObject;
+
 import java.util.List;
+import java.util.Map;
 
 /**
  * ======================================================================================
@@ -25,19 +35,20 @@ public class QwenLLMService {
 
     // @Value 的意思是：去配置文件(application.yml)里找一个叫 spring.ai.openai.api-key 的东西。
     // 我们主要用它来检查是不是没配置 key，如果没配置，就用假数据，防止报错。
-    @Value("${spring.ai.openai.api-key:}")
+    @Value("${app.ai.llm.api-key:}")
     private String apiKey;
 
-    // ChatClient 是 Spring AI 提供的超级秘书。
-    // 我们只要告诉它“帮我问问这个”，它就会自动帮我们联系阿里云，把结果拿回来。
-    // 比以前那个“邮递员”(RestTemplate) 更加智能、更加高级。
-    private final ChatClient chatClient;
+    @Value("${app.ai.llm.model:qwen-long}")
+    private String modelLlm;
 
-    // 构造函数：当这个类被创建的时候，Spring 会自动把 ChatClient.Builder（秘书招聘官）塞进来。
-    // 我们用招聘官现场雇佣一个专属的 ChatClient。
-    public QwenLLMService(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
-    }
+    @Value("${app.ai.llm.base-url:https://api.openai.com}")
+    private String baseUrl;
+
+    @Value("${app.ai.llm.default-model:gpt-5.4-mini}")
+    private String openAiDefaultModel;
+
+    @Value("${app.ai.llm.mock-on-error:true}")
+    private boolean mockOnError;
 
     /**
      * 方法名：analyzeMusicLyrics (分析歌词)
@@ -70,40 +81,98 @@ public class QwenLLMService {
      */
     public String callQwenLLM(String prompt) {
         // 先检查一下钥匙（API Key）有没有带，或者是不是假的。
-        // 如果没带钥匙，或者钥匙是假的，那就别去麻烦阿里云了，直接自己编一个结果（Mock数据）返回去。
-        // 这样即使没有配置好，程序也不会报错崩溃。
         if (apiKey == null || apiKey.isEmpty() || apiKey.startsWith("your_")) {
+            System.err.println("LLM API Key 未配置，回退到 mock 分析。baseUrl=" + safe(baseUrl) + ", model=" + safe(resolveModelName()));
             return mockAnalysis(prompt);
         }
 
-        // try...catch 的意思是：尝试做一件危险的事情（上网请求）。
-        // 如果中间出了任何问题（断网了、服务器炸了），就会跳到 catch 里面去处理，而不是让整个程序死机。
         try {
-            // =================================================================
-            // Spring AI 的魔法时刻！
-            // 
-            // chatClient.prompt() -> 嘿，秘书，我要提问了。
-            // .user(prompt)       -> 问题的内容是这个（prompt）。
-            // .call()             -> 赶紧打个电话给阿里云。
-            // .content()          -> 只要把对方说的话（内容）告诉我，其他的客套话都不要。
-            // =================================================================
-            String response = chatClient.prompt()
-                .user(prompt)
-                .call()
-                .content();
+            // 使用原生 HttpClient 替代 ChatClient，以获得更稳定的控制和明确的 URL
+            // 这样可以避免 Spring AI 版本差异导致的 URL 拼接问题
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
 
-            // 如果回信是空的，那说明出大问题了。
-            if (response == null || response.isEmpty()) {
-                throw new RuntimeException("AI 没理我们，响应是空的");
+            // 构建请求体 JSON
+            Gson gson = new Gson();
+            Map<String, Object> message = Map.of("role", "user", "content", prompt);
+            Map<String, Object> requestBody = Map.of(
+                    "model", resolveModelName(),
+                    "messages", List.of(message)
+            );
+            String jsonBody = gson.toJson(requestBody);
+
+            // 构建请求
+            // 明确指定 https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(resolveChatCompletionsUrl()))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .timeout(Duration.ofSeconds(30)) // 30秒读取超时
+                    .build();
+
+            // 发送请求
+            System.out.println("正在调用 OpenAI 兼容接口: " + request.uri() + ", model=" + resolveModelName());
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("API请求失败，状态码: " + response.statusCode() + ", 响应: " + response.body());
             }
-            
-            return response;
+
+            // 解析响应：兼容标准 OpenAI JSON、字符串包装、以及极简纯文本返回
+            JsonElement responseElement = JsonParser.parseString(response.body());
+            if (responseElement.isJsonPrimitive()) {
+                String primitive = responseElement.getAsString();
+                if (primitive != null && !primitive.isBlank()) {
+                    return primitive;
+                }
+                throw new RuntimeException("API返回了空字符串");
+            }
+
+            if (!responseElement.isJsonObject()) {
+                throw new RuntimeException("API响应格式不正确");
+            }
+
+            JsonObject responseJson = responseElement.getAsJsonObject();
+            JsonArray choices = responseJson.getAsJsonArray("choices");
+            if (choices != null && !choices.isEmpty()) {
+                JsonObject firstChoice = choices.get(0).getAsJsonObject();
+                JsonObject messageObj = firstChoice.getAsJsonObject("message");
+                if (messageObj != null && messageObj.has("content")) {
+                    String content = extractContent(messageObj.get("content"));
+                    if (content == null || content.isEmpty()) {
+                        throw new RuntimeException("AI 没理我们，响应内容是空的");
+                    }
+                    return content;
+                }
+            }
+
+            if (responseJson.has("content")) {
+                String content = responseJson.get("content").getAsString();
+                if (content != null && !content.isBlank()) {
+                    return content;
+                }
+            }
+
+            if (responseJson.has("message")) {
+                JsonElement messageElement = responseJson.get("message");
+                if (messageElement.isJsonPrimitive()) {
+                    String content = messageElement.getAsString();
+                    if (content != null && !content.isBlank()) {
+                        return content;
+                    }
+                }
+            }
+
+            throw new RuntimeException("API返回了空结果");
 
         } catch (Exception e) {
-            // 如果整个过程任何地方出错了，就会来到这里。
-            System.err.println("AI 调用出错了: " + e.getMessage());
-            e.printStackTrace(); // 打印详细的错误日记，方便程序员查错
-            // 出错了也不怕，我们有备用方案（Mock数据），保证用户看到的界面是正常的。
+            System.err.println("OpenAI 兼容接口调用出错了: " + e.getMessage() + ", baseUrl=" + safe(baseUrl) + ", model=" + safe(resolveModelName()));
+            e.printStackTrace();
+            if (!mockOnError) {
+                throw new RuntimeException("LLM 调用失败: " + e.getMessage(), e);
+            }
             return mockAnalysis(prompt);
         }
     }
@@ -206,5 +275,64 @@ public class QwenLLMService {
             // 只要报错，就说明连接失败
             return false;
         }
+    }
+
+    private String resolveChatCompletionsUrl() {
+        String normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        if (normalizedBaseUrl.endsWith("/chat/completions")) {
+            return normalizedBaseUrl;
+        }
+        if (normalizedBaseUrl.endsWith("/v1") || normalizedBaseUrl.endsWith("/v/1")) {
+            return normalizedBaseUrl + "/chat/completions";
+        }
+        return normalizedBaseUrl + "/v1/chat/completions";
+    }
+
+    private String resolveModelName() {
+        if (modelLlm == null || modelLlm.isBlank()) {
+            return openAiDefaultModel;
+        }
+        if ("qwen-long".equals(modelLlm) && !isQwenCompatibleEndpoint(baseUrl)) {
+            return openAiDefaultModel;
+        }
+        if (baseUrl != null && baseUrl.contains("openrouter.vip") && "qwen-long".equals(modelLlm)) {
+            return openAiDefaultModel;
+        }
+        return modelLlm;
+    }
+
+    private boolean isQwenCompatibleEndpoint(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return false;
+        }
+        String normalized = endpoint.toLowerCase();
+        return normalized.contains("dashscope") || normalized.contains("qwen");
+    }
+
+    private String extractContent(JsonElement contentElement) {
+        if (contentElement == null || contentElement.isJsonNull()) {
+            return "";
+        }
+        if (contentElement.isJsonPrimitive()) {
+            return contentElement.getAsString();
+        }
+        if (contentElement.isJsonArray()) {
+            StringBuilder builder = new StringBuilder();
+            for (JsonElement item : contentElement.getAsJsonArray()) {
+                if (!item.isJsonObject()) {
+                    continue;
+                }
+                JsonObject object = item.getAsJsonObject();
+                if (object.has("text")) {
+                    builder.append(object.get("text").getAsString());
+                }
+            }
+            return builder.toString().trim();
+        }
+        return contentElement.toString();
+    }
+
+    private String safe(String value) {
+        return value == null || value.isBlank() ? "<empty>" : value;
     }
 }

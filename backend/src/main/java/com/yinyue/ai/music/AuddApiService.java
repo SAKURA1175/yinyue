@@ -36,7 +36,7 @@ public class AuddApiService {
     // 用途：向 Audd.io 证明你有权使用识曲服务
     // 负责收、收费針收區控制
     // 获取方式：按访 Audd.io 官网登录账符
-    @Value("${app.ai.audd.api-key}")
+    @Value("${app.ai.audd.api-key:}")
     private String apiKey;
 
     // 【Audd 服务的网络地址】
@@ -75,6 +75,10 @@ public class AuddApiService {
         recover = "recoverFromAuddError"
     )
     public String recognizeAudio(File audioFile) {
+        if (apiKey == null || apiKey.isBlank() || apiKey.startsWith("your_")) {
+            return recoverFromAuddError(new IllegalStateException("Audd API key 未配置"));
+        }
+
         try {
             // 1. 读取文件：把硬盘上的 mp3 文件变成电脑能看懂的 010101... (字节数组)
             byte[] audioBytes = Files.readAllBytes(audioFile.toPath());
@@ -125,6 +129,10 @@ public class AuddApiService {
         backoff = @Backoff(delay = 1000, multiplier = 2.0)
     )
     public String recognizeAudioUrl(String audioUrl) {
+        if (apiKey == null || apiKey.isBlank() || apiKey.startsWith("your_")) {
+            return recoverFromAuddError(new IllegalStateException("Audd API key 未配置"));
+        }
+
         try {
             Map<String, String> payload = new HashMap<>();
             payload.put("api_token", apiKey); // 通行证

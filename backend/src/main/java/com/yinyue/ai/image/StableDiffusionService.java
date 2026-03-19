@@ -3,6 +3,14 @@ package com.yinyue.ai.image;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Base64;
+import java.io.ByteArrayOutputStream;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +67,9 @@ public class StableDiffusionService {
     // 这个值可以改成远程服务器的地址，比如 http://192.168.1.100:7860
     @Value("${app.ai.stable-diffusion.endpoint:http://127.0.0.1:7860}")
     private String sdEndpoint;
+
+    @Value("${app.ai.stable-diffusion.enabled:true}")
+    private boolean sdEnabled;
 
     // 【Spring 提供的 HTTP 请求工具】
     // 用途：这是发送 HTTP POST/GET 请求的"邮递员"，用来和 SD 通讯
@@ -272,6 +283,11 @@ public class StableDiffusionService {
      * @return 图片 Base64
      */
     public String generateImage(ImageGenerationOptions options) {
+        if (!sdEnabled || !isServiceAvailable()) {
+            log.warn("Stable Diffusion 不可用，返回演示占位封面");
+            return generatePlaceholderCover(options.getPrompt(), options.getWidth(), options.getHeight());
+        }
+
         try {
             log.info("开始生成图片，提示词: {}", options.getPrompt());
 
@@ -333,9 +349,8 @@ public class StableDiffusionService {
             return images.get(0);
 
         } catch (Exception e) {
-            // 如果出错了，记录日志并告诉外面
-            log.error("图片生成异常: {}", e.getMessage(), e);
-            throw new RuntimeException("图片生成失败: " + e.getMessage());
+            log.error("图片生成异常，回退到演示占位封面: {}", e.getMessage(), e);
+            return generatePlaceholderCover(options.getPrompt(), options.getWidth(), options.getHeight());
         }
     }
 
@@ -375,5 +390,55 @@ public class StableDiffusionService {
             log.warn("Stable Diffusion 服务好像挂了: {}", e.getMessage());
             return false;
         }
+    }
+
+    private String generatePlaceholderCover(String prompt, int width, int height) {
+        try {
+            int safeWidth = Math.max(width, 512);
+            int safeHeight = Math.max(height, 512);
+            BufferedImage image = new BufferedImage(safeWidth, safeHeight, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = image.createGraphics();
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            graphics.setColor(new Color(18, 24, 38));
+            graphics.fillRect(0, 0, safeWidth, safeHeight);
+
+            graphics.setColor(new Color(181, 62, 62));
+            graphics.fillOval(-safeWidth / 8, -safeHeight / 8, safeWidth / 2, safeHeight / 2);
+
+            graphics.setColor(new Color(35, 79, 122));
+            graphics.fillOval(safeWidth / 2, safeHeight / 3, safeWidth / 2, safeHeight / 2);
+
+            graphics.setColor(Color.WHITE);
+            graphics.setFont(new Font("SansSerif", Font.BOLD, 28));
+            graphics.drawString("Demo Cover", 36, 56);
+
+            graphics.setFont(new Font("SansSerif", Font.PLAIN, 18));
+            graphics.setColor(new Color(228, 228, 228));
+            for (String line : wrapText(prompt == null ? "Album cover placeholder" : prompt, 36)) {
+                graphics.drawString(line, 36, 96 + (24 * wrapText(prompt == null ? "Album cover placeholder" : prompt, 36).indexOf(line)));
+            }
+
+            graphics.setColor(new Color(240, 198, 94));
+            graphics.fillRect(36, safeHeight - 70, safeWidth - 72, 18);
+            graphics.setColor(new Color(220, 220, 220));
+            graphics.drawString("Stable Diffusion offline - placeholder preview", 36, safeHeight - 28);
+            graphics.dispose();
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", outputStream);
+            return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+        } catch (Exception e) {
+            throw new RuntimeException("占位封面生成失败: " + e.getMessage(), e);
+        }
+    }
+
+    private List<String> wrapText(String text, int maxChars) {
+        String source = text == null || text.isBlank() ? "Album cover placeholder" : text;
+        java.util.ArrayList<String> lines = new java.util.ArrayList<>();
+        for (int start = 0; start < source.length() && lines.size() < 10; start += maxChars) {
+            lines.add(source.substring(start, Math.min(source.length(), start + maxChars)));
+        }
+        return lines;
     }
 }

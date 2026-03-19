@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../lib/api'
 import './Upload.css'
-
-const API_BASE = 'http://localhost:8081/api'
 
 export default function Upload({ onUploadSuccess, neteaseData, onClearNetease, onAudioSelected }) {
   const [file, setFile] = useState(null)
@@ -38,9 +36,9 @@ export default function Upload({ onUploadSuccess, neteaseData, onClearNetease, o
       const formData = new FormData()
       formData.append('file', file)
 
-      // 第一步：仅上传文件，获取服务器上的保存路径
-      const uploadRes = await axios.post(
-        `${API_BASE}/upload/audio`,
+      // 第一步：仅上传文件，获取 uploadId
+      const uploadRes = await api.post(
+        '/upload/audio',
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -54,14 +52,16 @@ export default function Upload({ onUploadSuccess, neteaseData, onClearNetease, o
         return
       }
 
-      const filePath = uploadRes.data.data.filePath
+      const uploadId = uploadRes.data.data.uploadId
 
       // 第二步：调用后端音乐识别接口，使用真实音频信息
       let musicInfo = null
+      let featureInfo = null
+      let semanticInfo = null
       try {
-        const recognizeRes = await axios.post(
-          `${API_BASE}/music/recognize`,
-          new URLSearchParams({ filePath })
+        const recognizeRes = await api.post(
+          '/music/recognize',
+          new URLSearchParams({ uploadId, useSeparatedVocals: 'true' })
         )
         if (recognizeRes.data.code === 200) {
           musicInfo = recognizeRes.data.data
@@ -71,14 +71,65 @@ export default function Upload({ onUploadSuccess, neteaseData, onClearNetease, o
         console.error('音乐识别失败', e)
       }
 
+      try {
+        const [featuresRes, semanticRes] = await Promise.allSettled([
+          api.post('/music/features', new URLSearchParams({ uploadId, includeStems: 'true' })),
+          api.post('/music/semantic', new URLSearchParams({ uploadId }))
+        ])
+
+        if (featuresRes.status === 'fulfilled' && featuresRes.value.data.code === 200) {
+          featureInfo = featuresRes.value.data.data
+        } else if (featuresRes.status === 'rejected') {
+          console.error('音频特征分析失败', featuresRes.reason)
+        }
+
+        if (semanticRes.status === 'fulfilled' && semanticRes.value.data.code === 200) {
+          semanticInfo = semanticRes.value.data.data
+        } else if (semanticRes.status === 'rejected') {
+          console.error('音乐语义分析失败', semanticRes.reason)
+        }
+      } catch (e) {
+        console.error('音频增强分析失败', e)
+      }
+
       setMessage('上传成功')
       setMessageType('success')
 
       // 向上抛出用于分析页的真实音乐信息
       if (onUploadSuccess) {
+        const normalizedTitle = musicInfo?.title?.trim() || file.name.replace(/\.[^.]+$/, '')
+        const normalizedArtist = musicInfo?.artist?.trim() || '未知'
+        const normalizedAlbum = musicInfo?.album?.trim() || '未知'
+        const track = {
+          title: normalizedTitle,
+          artist: normalizedArtist,
+          album: normalizedAlbum,
+          cover_url: musicInfo?.cover_url || '',
+          lyrics: musicInfo?.lyrics || '',
+          type: musicInfo?.type || 'audio',
+          uploadId,
+        }
+
+        const bpm = featureInfo?.rhythm?.bpm
+        const tonalKey = featureInfo?.tonal?.key
+        const tonalScale = featureInfo?.tonal?.scale
         onUploadSuccess({
           ...(musicInfo || {}),
-          filePath,
+          ...track,
+          uploadId,
+          bpm,
+          key: tonalKey ? `${tonalKey} ${tonalScale || ''}`.trim() : undefined,
+          audioFeatures: featureInfo,
+          semanticProfile: semanticInfo,
+          track,
+          analysisSnapshot: {
+            rhythm: featureInfo?.rhythm || null,
+            tonal: featureInfo?.tonal || null,
+            energy: featureInfo?.energy || null,
+            spectral: featureInfo?.spectral || null,
+            danceability: featureInfo?.danceability || null,
+            chords: featureInfo?.chords || null,
+          },
         })
       }
     } catch (error) {

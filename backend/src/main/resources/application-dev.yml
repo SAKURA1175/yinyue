@@ -1,0 +1,9 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+app:
+  security:
+    enabled: false
+    rate-limit-enabled: false

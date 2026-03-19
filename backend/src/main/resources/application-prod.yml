@@ -1,0 +1,4 @@
+app:
+  security:
+    enabled: ${APP_SECURITY_ENABLED:true}
+    rate-limit-enabled: ${APP_RATE_LIMIT_ENABLED:true}

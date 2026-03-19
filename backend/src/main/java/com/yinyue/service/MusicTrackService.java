@@ -1,6 +1,7 @@
 package com.yinyue.service;
 
-import com.yinyue.ai.image.StableDiffusionService;
+import com.yinyue.ai.music.AuddApiService;
+import com.yinyue.dto.GenerationHistoryItem;
 import com.yinyue.entity.MusicTrack;
 import com.yinyue.repository.MusicTrackRepository;
 import org.slf4j.Logger;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * ======================================================================================
@@ -29,13 +32,9 @@ public class MusicTrackService {
     // 仓库管理员：负责存取数据
     private final MusicTrackRepository musicTrackRepository;
     
-    // AI 画家：负责画图
-    private final StableDiffusionService stableDiffusionService;
-
     // 构造函数：招聘员工入职
-    public MusicTrackService(MusicTrackRepository musicTrackRepository, StableDiffusionService stableDiffusionService) {
+    public MusicTrackService(MusicTrackRepository musicTrackRepository) {
         this.musicTrackRepository = musicTrackRepository;
-        this.stableDiffusionService = stableDiffusionService;
     }
 
     /**
@@ -50,12 +49,13 @@ public class MusicTrackService {
     public MusicTrack saveGeneratedCover(String prompt, String base64Image) {
         // 创建一张新的登记卡
         MusicTrack track = new MusicTrack();
-        track.setTitle("AI Generated Track"); // 先起个默认名字
+        track.setTitle("AI Generated Cover"); // 先起个默认名字
         track.setArtist("AI Composer"); // 歌手就是 AI
         track.setFilePath(""); // 因为这只是个封面，还没有音频文件
         track.setCreatedAt(LocalDateTime.now()); // 记录现在的时间
         track.setUpdatedAt(LocalDateTime.now());
-        track.setStatus("COMPLETED"); // 状态设为完成
+        track.setStatus("GENERATED"); // 状态设为完成
+        track.setRecordType("GENERATION");
         track.setAiAnalysis("Prompt: " + prompt); // 把提示词记下来，方便以后看
         
         // 如果有图片数据
@@ -80,8 +80,11 @@ public class MusicTrackService {
      * 
      * 作用：把仓库里所有的歌都拿出来。
      */
-    public List<MusicTrack> getAllHistory() {
-        return musicTrackRepository.findAll();
+    public List<GenerationHistoryItem> getGenerationHistory() {
+        return musicTrackRepository.findByRecordTypeOrderByCreatedAtDesc("GENERATION")
+                .stream()
+                .map(this::toHistoryItem)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -93,8 +96,46 @@ public class MusicTrackService {
         if (track.getCreatedAt() == null) {
             track.setCreatedAt(LocalDateTime.now());
         }
+        if (track.getRecordType() == null || track.getRecordType().isBlank()) {
+            track.setRecordType("TRACK");
+        }
         track.setUpdatedAt(LocalDateTime.now());
         return musicTrackRepository.save(track);
+    }
+
+    public MusicTrack createUploadRecord(String fileName, String filePath, long fileSize) {
+        MusicTrack track = new MusicTrack();
+        track.setTitle(fileName == null || fileName.isBlank() ? "待识别音频" : fileName);
+        track.setArtist("待识别");
+        track.setAlbum("待识别");
+        track.setFilePath(filePath);
+        track.setFileSize(fileSize);
+        track.setStatus("UPLOADED");
+        track.setRecordType("TRACK");
+        return saveTrack(track);
+    }
+
+    public void updateRecognition(MusicTrack track, AuddApiService.MusicInfo musicInfo, String rawResult) {
+        if (musicInfo != null) {
+            if (!isBlank(musicInfo.getTitle())) {
+                track.setTitle(musicInfo.getTitle());
+            }
+            if (!isBlank(musicInfo.getArtist())) {
+                track.setArtist(musicInfo.getArtist());
+            }
+            if (!isBlank(musicInfo.getAlbum())) {
+                track.setAlbum(musicInfo.getAlbum());
+            }
+        }
+        if (!isBlank(rawResult)) {
+            track.setAuddResult(rawResult);
+        }
+        track.setStatus("RECOGNIZED");
+        saveTrack(track);
+    }
+
+    public Optional<MusicTrack> findByFilePath(String filePath) {
+        return musicTrackRepository.findByFilePath(filePath);
     }
 
     /**
@@ -141,5 +182,30 @@ public class MusicTrackService {
     public MusicTrack getTrackById(Long id) {
         return musicTrackRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("找不到这首歌，ID: " + id));
+    }
+
+    private GenerationHistoryItem toHistoryItem(MusicTrack track) {
+        GenerationHistoryItem item = new GenerationHistoryItem();
+        item.setId(track.getId());
+        item.setTitle(track.getTitle());
+        item.setArtist(track.getArtist());
+        item.setCreatedAt(track.getCreatedAt());
+        item.setCoverUrl(track.getCoverUrl());
+        item.setPromptSummary(stripPromptPrefix(track.getAiAnalysis()));
+        if (track.getAlbumCover() != null && track.getAlbumCover().length > 0) {
+            item.setCoverImageBase64(Base64.getEncoder().encodeToString(track.getAlbumCover()));
+        }
+        return item;
+    }
+
+    private String stripPromptPrefix(String aiAnalysis) {
+        if (aiAnalysis == null) {
+            return "";
+        }
+        return aiAnalysis.startsWith("Prompt: ") ? aiAnalysis.substring(8) : aiAnalysis;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

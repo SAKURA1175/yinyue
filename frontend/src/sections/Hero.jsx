@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../lib/api'
 import './Hero.css'
-
-const API_BASE = 'http://localhost:8081/api'
 
 export default function Hero({ onNavigate, uploadRef, onNeteaseImportSuccess }) {
   const [activeTab, setActiveTab] = useState('upload')
@@ -23,7 +21,7 @@ export default function Hero({ onNavigate, uploadRef, onNeteaseImportSuccess }) 
       console.log('[网易云解析] 开始请求...', neteaseUrl)
       
       // 调用后端网易云解析API
-      const response = await axios.get(`${API_BASE}/ai/netease`, {
+      const response = await api.get('/ai/netease', {
         params: { link: neteaseUrl }
       })
 

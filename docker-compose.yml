@@ -1,31 +1,28 @@
-version: '3.8'
-
 services:
-  # PostgreSQL 数据库
-  postgres:
-    image: postgres:15-alpine
-    container_name: yinyue-postgres
+  mysql:
+    image: mysql:8.0
+    container_name: yinyue-mysql
     environment:
-      POSTGRES_DB: yinyue_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${APP_DB_NAME:-yinyue_db}
+      MYSQL_USER: ${APP_DB_USERNAME:-yinyue}
+      MYSQL_PASSWORD: ${APP_DB_PASSWORD:-yinyue}
     ports:
-      - "5432:5432"
+      - "${MYSQL_PORT:-3307}:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # Redis 缓存
   redis:
     image: redis:7-alpine
     container_name: yinyue-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -34,6 +31,52 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: yinyue-backend
+    ports:
+      - "${BACKEND_PORT:-8081}:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      APP_SERVER_PORT: 8081
+      APP_DB_URL: jdbc:mysql://mysql:3306/${APP_DB_NAME:-yinyue_db}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true&allowLoadLocalInfile=false&createDatabaseIfNotExist=true
+      APP_DB_USERNAME: ${APP_DB_USERNAME:-yinyue}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-yinyue}
+      APP_REDIS_HOST: redis
+      APP_REDIS_PORT: 6379
+      APP_STORAGE_LOCAL_PATH: /app/runtime/uploads
+      APP_PYTHON_COMMAND: /opt/audio-venv/bin/python
+      APP_NETEASE_SCRIPT_PATH: /app/netease_parser.py
+      APP_ANALYSIS_PYTHON_COMMAND: /opt/audio-venv/bin/python
+      APP_ANALYSIS_SCRIPT_PATH: /app/scripts/analyze_audio.py
+      APP_ANALYSIS_PROVIDER: ${APP_ANALYSIS_PROVIDER:-essentia}
+      APP_ANALYSIS_TIMEOUT_SECONDS: ${APP_ANALYSIS_TIMEOUT_SECONDS:-120}
+      APP_SEMANTIC_PYTHON_COMMAND: /opt/audio-venv/bin/python
+      APP_SEMANTIC_SCRIPT_PATH: /app/scripts/extract_music_semantics.py
+      APP_SEMANTIC_TIMEOUT_SECONDS: ${APP_SEMANTIC_TIMEOUT_SECONDS:-300}
+      APP_SEPARATION_PYTHON_COMMAND: /opt/audio-venv/bin/python
+      APP_SEPARATION_SCRIPT_PATH: /app/scripts/separate_audio.py
+      APP_SEPARATION_OUTPUT_ROOT: /app/runtime/separated
+      APP_SEPARATION_TIMEOUT_SECONDS: ${APP_SEPARATION_TIMEOUT_SECONDS:-300}
+      APP_SECURITY_ENABLED: ${APP_SECURITY_ENABLED:-true}
+      APP_RATE_LIMIT_ENABLED: ${APP_RATE_LIMIT_ENABLED:-true}
+      APP_RATE_LIMIT_PER_MINUTE: ${APP_RATE_LIMIT_PER_MINUTE:-60}
+      APP_API_TOKEN: ${APP_API_TOKEN:-}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      APP_QWEN_API_KEY: ${APP_QWEN_API_KEY:-}
+      APP_AUDD_API_KEY: ${APP_AUDD_API_KEY:-}
+      APP_SD_ENDPOINT: ${APP_SD_ENDPOINT:-http://host.docker.internal:7860}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_runtime:/app/runtime
+
 volumes:
-  postgres_data:
+  mysql_data:
   redis_data:
+  backend_runtime:

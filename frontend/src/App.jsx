@@ -11,7 +11,6 @@ export default function App() {
   const [musicData, setMusicData] = useState(null)
   const [neteaseData, setNeteaseData] = useState(null)
   const [analysis, setAnalysis] = useState(null)
-  const [generatedImage, setGeneratedImage] = useState(null)
   const [audioUrl, setAudioUrl] = useState(null)
 
   const heroRef = useRef(null)
@@ -27,6 +26,7 @@ export default function App() {
   const handleNeteaseImportSuccess = (data) => {
     setMusicData(data)
     setNeteaseData(data)
+    setAnalysis(null)
     // 直接跳转到分析页面
     setActiveTab('analysis')
     setTimeout(() => analysisRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
@@ -34,6 +34,7 @@ export default function App() {
 
   const handleUploadSuccess = (data) => {
     setMusicData(data)
+    setAnalysis(null)
     // 保持当前的 audioUrl 不变，因为用户刚刚上传的文件就是这个
     // 如果需要切换到服务器路径，可以这里处理，但本地 blob 链接响应更快
     setActiveTab('analysis')
@@ -94,7 +95,7 @@ export default function App() {
       )}
 
       <section ref={generateRef} className="section generate-section">
-        <Generate analysis={analysis} onImageGenerated={setGeneratedImage} />
+        <Generate analysis={analysis} musicData={musicData} />
       </section>
 
       {/* 全局播放器 */}

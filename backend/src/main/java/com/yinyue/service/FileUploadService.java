@@ -4,11 +4,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -26,9 +29,19 @@ import java.util.UUID;
 @Service
 public class FileUploadService {
 
+    private static final Map<String, List<String>> ALLOWED_EXTENSIONS = Map.of(
+            "audio", List.of("mp3", "wav", "m4a", "flac", "ogg", "aac"),
+            "image", List.of("png", "jpg", "jpeg", "webp")
+    );
+
+    private static final Map<String, List<String>> ALLOWED_CONTENT_TYPES = Map.of(
+            "audio", List.of("audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave", "audio/mp4", "audio/aac", "audio/flac", "audio/x-flac", "audio/ogg"),
+            "image", List.of("image/png", "image/jpeg", "image/webp")
+    );
+
     // 从配置文件里读取我们要在哪里存文件。
     // 如果配置文件没写，默认就存在当前目录下的 "uploads" 文件夹里。
-    @Value("${app.storage.local-path:./uploads}")
+    @Value("${app.storage.local-path:./runtime/uploads}")
     private String uploadPath;
 
     /**
@@ -46,9 +59,13 @@ public class FileUploadService {
             throw new IllegalArgumentException("文件不能为空");
         }
 
+        String normalizedType = type.toLowerCase(Locale.ROOT);
+        byte[] fileBytes = file.getBytes();
+        validateFile(file, normalizedType, fileBytes);
+
         // 1. 准备目录
         // 拼凑出目标文件夹的路径，比如 "./uploads/audio"
-        Path uploadDir = Paths.get(uploadPath, type);
+        Path uploadDir = getUploadRoot().resolve(normalizedType).normalize();
         // 如果这个文件夹不存在，就创建一个。Files.createDirectories 很聪明，多级目录也能一次创建好。
         Files.createDirectories(uploadDir);
 
@@ -61,12 +78,12 @@ public class FileUploadService {
 
         // 3. 真正开始保存
         // 算出文件的完整路径：目录 + 新文件名
-        Path filePath = uploadDir.resolve(uniqueFilename);
+        Path filePath = uploadDir.resolve(uniqueFilename).normalize();
         // 把文件的内容（字节流）写到硬盘上
-        Files.write(filePath, file.getBytes());
+        Files.write(filePath, fileBytes);
 
         // 4. 告诉外面保存好了，路径在这里
-        return filePath.toString();
+        return filePath.toAbsolutePath().normalize().toString();
     }
 
     /**
@@ -109,5 +126,104 @@ public class FileUploadService {
      */
     public boolean fileExists(String filePath) {
         return Files.exists(Paths.get(filePath));
+    }
+
+    public Path getUploadRoot() {
+        return Paths.get(uploadPath).toAbsolutePath().normalize();
+    }
+
+    public String normalizeManagedPath(String filePath) {
+        if (filePath == null || filePath.isBlank()) {
+            throw new IllegalArgumentException("文件路径不能为空");
+        }
+
+        Path normalized = Paths.get(filePath).toAbsolutePath().normalize();
+        if (!normalized.startsWith(getUploadRoot())) {
+            throw new IllegalArgumentException("不允许访问上传目录之外的文件");
+        }
+        return normalized.toString();
+    }
+
+    public Path resolveManagedFile(String filePath) {
+        Path normalized = Paths.get(normalizeManagedPath(filePath));
+        if (!Files.exists(normalized)) {
+            throw new IllegalArgumentException("音频文件不存在: " + normalized);
+        }
+        return normalized;
+    }
+
+    private void validateFile(MultipartFile file, String type, byte[] fileBytes) {
+        if (!ALLOWED_EXTENSIONS.containsKey(type)) {
+            throw new IllegalArgumentException("不支持的文件类型分类: " + type);
+        }
+
+        String extension = getFileExtension(file.getOriginalFilename());
+        if (!ALLOWED_EXTENSIONS.get(type).contains(extension)) {
+            throw new IllegalArgumentException("不支持的文件扩展名: " + extension);
+        }
+
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.isBlank() && !ALLOWED_CONTENT_TYPES.get(type).contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("不支持的文件 Content-Type: " + contentType);
+        }
+
+        if (!matchesMagicHeader(type, extension, fileBytes)) {
+            throw new IllegalArgumentException("文件内容与扩展名不匹配");
+        }
+    }
+
+    private boolean matchesMagicHeader(String type, String extension, byte[] fileBytes) {
+        if (fileBytes.length < 12) {
+            return false;
+        }
+
+        if ("audio".equals(type)) {
+            return switch (extension) {
+                case "mp3" -> startsWith(fileBytes, "ID3") || (fileBytes[0] & 0xFF) == 0xFF;
+                case "wav" -> startsWith(fileBytes, "RIFF") && containsAt(fileBytes, "WAVE", 8);
+                case "flac" -> startsWith(fileBytes, "fLaC");
+                case "ogg" -> startsWith(fileBytes, "OggS");
+                case "m4a", "aac" -> containsAt(fileBytes, "ftyp", 4);
+                default -> false;
+            };
+        }
+
+        return switch (extension) {
+            case "png" -> startsWith(fileBytes, new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
+            case "jpg", "jpeg" -> startsWith(fileBytes, new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF});
+            case "webp" -> startsWith(fileBytes, "RIFF") && containsAt(fileBytes, "WEBP", 8);
+            default -> false;
+        };
+    }
+
+    private boolean startsWith(byte[] fileBytes, String signature) {
+        return startsWith(fileBytes, signature.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private boolean startsWith(byte[] fileBytes, byte[] signature) {
+        if (fileBytes.length < signature.length) {
+            return false;
+        }
+
+        for (int i = 0; i < signature.length; i++) {
+            if (fileBytes[i] != signature[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean containsAt(byte[] fileBytes, String signature, int offset) {
+        byte[] signatureBytes = signature.getBytes(StandardCharsets.US_ASCII);
+        if (fileBytes.length < offset + signatureBytes.length) {
+            return false;
+        }
+
+        for (int i = 0; i < signatureBytes.length; i++) {
+            if (fileBytes[offset + i] != signatureBytes[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 }

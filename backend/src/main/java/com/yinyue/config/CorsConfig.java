@@ -1,5 +1,6 @@
 package com.yinyue.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -23,6 +24,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration // 告诉 Spring：这是一个配置类，系统启动的时候要先读我。
 public class CorsConfig implements WebMvcConfigurer {
 
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174}")
+    private String allowedOrigins;
+
     /**
      * 方法名：addCorsMappings (添加跨域映射规则)
      * 
@@ -37,7 +41,7 @@ public class CorsConfig implements WebMvcConfigurer {
                 
                 // allowedOrigins: 允许哪些“小区”的人进来。
                 // 这里我们允许了本机的前端开发环境（localhost:5173 等）。
-                .allowedOrigins("http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174")
+                .allowedOrigins(parseAllowedOrigins())
                 
                 // allowedMethods: 允许他们做什么动作。
                 // GET: 查东西
@@ -51,12 +55,12 @@ public class CorsConfig implements WebMvcConfigurer {
                 // "*" 表示带什么都行。
                 .allowedHeaders("*")
                 
-                // allowCredentials: 是否允许带“身份证”（Cookie 等敏感信息）。
-                // true 表示允许，这样才能做登录状态保持。
-                .allowCredentials(true)
-                
                 // maxAge: 这条规则的有效期。
                 // 3600 秒（1小时）内，浏览器不用每次都问保安大爷“能不能进”，直接进就行。
                 .maxAge(3600);
+    }
+
+    private String[] parseAllowedOrigins() {
+        return allowedOrigins.split("\\s*,\\s*");
     }
 }

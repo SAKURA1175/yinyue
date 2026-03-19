@@ -80,6 +80,9 @@ public class MusicTrack {
     @Column
     private String status; // 状态：比如 "PENDING" (处理中), "COMPLETED" (完成), "FAILED" (失败)
 
+    @Column(nullable = false)
+    private String recordType = "TRACK"; // 记录类型：TRACK(上传记录) / GENERATION(生成历史)
+
     // ==========================================
     // Getters and Setters (存取方法)
     // 就像是自动取款机，想存钱用 Set，想取钱用 Get。
@@ -122,4 +125,7 @@ public class MusicTrack {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getRecordType() { return recordType; }
+    public void setRecordType(String recordType) { this.recordType = recordType; }
 }

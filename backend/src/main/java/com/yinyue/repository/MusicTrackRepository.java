@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ======================================================================================
@@ -37,4 +38,8 @@ public interface MusicTrackRepository extends JpaRepository<MusicTrack, Long> {
      * 这样我们就能很方便地拿到所有已经处理完的歌曲，而且最新的歌排在最前面。
      */
     List<MusicTrack> findByStatusOrderByCreatedAtDesc(String status);
+
+    List<MusicTrack> findByRecordTypeOrderByCreatedAtDesc(String recordType);
+
+    Optional<MusicTrack> findByFilePath(String filePath);
 }
